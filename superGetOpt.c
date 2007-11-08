@@ -140,6 +140,7 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 	struct optionlist_s optionlist[MAXOPTS+1];
 	int return_val;
 	int lastArgProcessed = argc;
+	int lastFlag = 0;
 	
 	// To do: return correct value (error or last arg processed) in all cases
 	
@@ -262,12 +263,14 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 	while( argsleft > 0 )
 	{
 
-	for( i = 0 ; i < optnum && argsleft > 0 ; i++ )
+	for( i = 0, lastFlag = 0 ; i < optnum && argsleft > 0 ; i++ )
 	{
 		//printf("Looking for option %d <%s>: argv=<%s> argsleft=%d\n", i, optionlist[i].name,argv[0],argsleft);
 		found = 0;
 		if( strcmp( argv[0], optionlist[i].name ) == 0 )
 		{
+			lastFlag = i;
+			
 			found = 1;
 			argsleft--;			
 			if( argsleft > 0 ) argv++;
@@ -447,6 +450,12 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 	}
 	if( found == 0 )
 	{
+		//printf("option not found at argv=%s left=%d\n",argv[0],argsleft);
+#if DEBUG
+		fprintf(stderr,"User supply too many arguments to option name <%s> Expected %d\n",optionlist[lastFlag].name,optionlist[lastFlag].numargs);
+#endif
+		*argErr = lastArgProcessed;
+		return( SG_ERROR_TOO_MANY_ARGS );
 		if( argsleft > 0 ) argv++;
 		argsleft--;
 	}

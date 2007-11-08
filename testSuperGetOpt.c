@@ -52,7 +52,7 @@ int main( int argc, char *argv[] )
 			"-what %s", &ss,
 			"-help", &helpSet,
 			(char * ) 0 ); 
-#if 0	
+#if 1	
 	printf("-puffy has c=%c double=%lf s=%s int=%d eminem has short=%hd fl=%f\n", c,lf,s,d,h,f);
 	//printf("-stringo array=%s,%s,%s nums=%d\n", sarray[0],sarray[1],sarray[2],nums);
 	for( i = 0, printf("stringo: ") ; i < nums ; i++ )
