@@ -55,5 +55,6 @@ int superParseOpt( int argc, char **argv, int *argErr, ... );
 #define SG_ERROR_NO_FORMATS -9
 #define SG_ERROR_MIXED_TYPES_IN_VAR -10
 #define SG_ERROR_ZERO_LEN_OPTION -11
+#define SG_ERROR_TOO_MANY_ARGS -12
 
 #endif
