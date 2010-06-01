@@ -86,7 +86,7 @@ struct optionlist_s
 };
 
 
-static int superParseInternal( int argc, char **argv, int *argErr, va_list ap );
+static int superParseInternal( int argc, char **argv, int *lastArg, va_list ap );
 static ANYTYPE getval(char *s, int type, int *flag);
 static char myread_char(char *s, int *flag);
 static short myread_short(char *s, int *flag);
@@ -97,7 +97,7 @@ static int parse_string(char *s, struct optionlist_s *option, int *noName);
 static int check_if_option(char *s, struct optionlist_s *optionlist, int numopts);
 static int parse_format(char *s, int *argtypes);
 
-int superGetOpt( int argc, char **argv, int *argErr, ... )
+int superGetOpt( int argc, char **argv, int *lastArg, ... )
 {
 	va_list ap;
 	int n;
@@ -105,30 +105,30 @@ int superGetOpt( int argc, char **argv, int *argErr, ... )
 	argc--;
 	argv++;
 	
-	va_start( ap, argErr );
+	va_start( ap, lastArg );
 
-	n = superParseInternal( argc, argv, argErr, ap );
+	n = superParseInternal( argc, argv, lastArg, ap );
 	
 	va_end( ap );
 	
 	return(n);
 }
 
-int superParseOpt( int argc, char **argv, int *argErr, ... )
+int superParseOpt( int argc, char **argv, int *lastArg, ... )
 {
 	va_list ap;
 	int n;
 	
-	va_start( ap, argErr );
+	va_start( ap, lastArg );
 
-	n = superParseInternal( argc, argv, argErr, ap );
+	n = superParseInternal( argc, argv, lastArg, ap );
 	
 	va_end( ap );
 	
 	return(n);
 }
 
-static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
+static int superParseInternal( int argc, char **argv, int *lastArg, va_list ap )
 {
 	char *optstring[MAXOPTS+1];
 	int optnum, argsleft;
@@ -140,6 +140,7 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 	struct optionlist_s optionlist[MAXOPTS+1];
 	int return_val;
 	int lastArgProcessed = argc;
+	int lastArgProcessedSuccessfully = 1;
 	int lastFlag = 0;
 	
 	// To do: return correct value (error or last arg processed) in all cases
@@ -247,8 +248,8 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 #if DEBUG
 			fprintf(stderr, "Too many options in string. More than %d\n",MAXOPTS);
 #endif
-			argErr = (int *) va_arg(ap, int *);
-			*argErr = optnum;
+			lastArg = (int *) va_arg(ap, int *);
+			*lastArg = optnum;
 			return( SG_ERR_TOO_MANY_OPTIONS );
 		}
 	}
@@ -272,7 +273,8 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 			lastFlag = i;
 			
 			found = 1;
-			argsleft--;			
+			argsleft--;	
+			lastArgProcessedSuccessfully++;		
 			if( argsleft > 0 ) argv++;
 			//printf("Found option <%s>\n", optionlist[i].name);
 			
@@ -315,13 +317,16 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 #if DEBUG
 							fprintf(stderr, "Bad argtype %d\n",optionlist[i].argtype[j]); 
 #endif
-							*argErr = lastArgProcessed;
+							//*lastArg = lastArgProcessed;
+							*lastArg = lastArgProcessedSuccessfully;
 							return( SG_ERROR_BAD_ARGTYPE );
 					}
 					
 					if( good == 0 )
 					{
 						lastArgProcessed = argc - argsleft + 1;
+						lastArgProcessedSuccessfully++;		
+						//printf("good read: lastArg=%d\n",lastArgProcessed);
 					}
 					else if( good == -1 )
 					{
@@ -331,7 +336,8 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 #if DEBUG
 							fprintf(stderr,"User did not supply correct arguments to option name <%s>\n",optionlist[i].name);
 #endif
-							*argErr = lastArgProcessed;
+							//*lastArg = lastArgProcessed;
+							*lastArg = lastArgProcessedSuccessfully;
 							return(SG_ERROR_INCORRECT_ARG);
 						}
 						else 
@@ -339,7 +345,8 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 #if DEBUG
 							fprintf(stderr,"User did not supply enough arguments to option name <%s>\n",optionlist[i].name);
 #endif
-							*argErr = lastArgProcessed;
+							//*lastArg = lastArgProcessed;
+							*lastArg = lastArgProcessedSuccessfully;
 							return( SG_ERROR_MISSING_ARG );
 						}
 					}
@@ -387,7 +394,8 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 #if DEBUG
 							fprintf(stderr, "Bad varargtype %d\n",optionlist[i].argtype[j]); 
 #endif
-							*argErr = lastArgProcessed;
+							//*lastArg = lastArgProcessed;
+							*lastArg = lastArgProcessedSuccessfully;
 							return( SG_ERROR_BAD_VARARGTYPE );
 					}
 					
@@ -395,6 +403,8 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 					{
 						*optionlist[i].pNumArgs = j+1;
 						lastArgProcessed = argc - argsleft + 1;
+						lastArgProcessedSuccessfully++;		
+						//printf("2 good read: lastArg=%d\n",lastArgProcessed);
 					}
 					
 					if( good == -1 )	/* bad data type */
@@ -405,7 +415,8 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 #if DEBUG
 							fprintf(stderr, "Var arg list bad data type for option <%s>\n",optionlist[i].name);
 #endif
-							*argErr = lastArgProcessed;
+							//*lastArg = lastArgProcessed;
+							*lastArg = lastArgProcessedSuccessfully;
 							return( SG_ERROR_INCORRECT_ARG );
 						}
 						else	/* next option detected -- end of var list -- move 1 arg back */
@@ -438,7 +449,8 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 #if DEBUG
 				fprintf(stderr,"User did not supply enough arguments to option name <%s> Expected %d Got %d\n",optionlist[i].name,optionlist[i].numargs,j);
 #endif
-				*argErr = lastArgProcessed;
+				//*lastArg = lastArgProcessed;
+				*lastArg = lastArgProcessedSuccessfully;
 				return( SG_ERROR_MISSING_ARG );
 			}
 			i = -1;  /* experimental bug fix? */
@@ -446,23 +458,26 @@ static int superParseInternal( int argc, char **argv, int *argErr, va_list ap )
 		else
 		{
 			found = 0;
+			//printf("last successful arg = %d\n",lastArgProcessedSuccessfully);
 		}
 	}
+
 	if( found == 0 )
 	{
-		//printf("option not found at argv=%s left=%d\n",argv[0],argsleft);
+		//fprintf(stderr,"option not found at argv=%s left=%d\n",argv[0],argsleft);
 #if DEBUG
-		fprintf(stderr,"User supply too many arguments to option name <%s> Expected %d\n",optionlist[lastFlag].name,optionlist[lastFlag].numargs);
+		//fprintf(stderr,"User did not supply option name <%s>\n",optionlist[lastFlag].name);
 #endif
-		*argErr = lastArgProcessed;
+		//*lastArg = lastArgProcessed+1;
+		*lastArg = lastArgProcessedSuccessfully;
 		return( SG_ERROR_TOO_MANY_ARGS );
 		if( argsleft > 0 ) argv++;
 		argsleft--;
 	}
-
+	
 	}
 
-	*argErr = lastArgProcessed;
+	*lastArg = lastArgProcessedSuccessfully;
 	//return_val = lastArgProcessed;
 	
 	return( return_val );

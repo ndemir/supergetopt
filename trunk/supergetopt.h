@@ -34,12 +34,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+				
 // for parsing commandline args
-int superGetOpt( int argc, char **argv, int *argErr, ... );
+int superGetOpt( int argc, char **argv, int *lastArg, ... );
 
 // for parsing args in a file, for instance, where argv[0] isn't ignored
-int superParseOpt( int argc, char **argv, int *argErr, ... );
+int superParseOpt( int argc, char **argv, int *lastArg, ... );
 
 #ifdef __cplusplus
 }
