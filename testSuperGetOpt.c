@@ -34,7 +34,7 @@ int main( int argc, char *argv[] )
 	int n, i;
 	int argErr;
 	
-	char c; double lf; char *s; int d; short h; float f;
+	char c; double lf; char *s; int d, d1, d2; short h; float f;
 	float farray[20];
 	int numf = 20; // must be set to max initially -- will be overwritten with actual number
 	char *sarray[10];
@@ -47,6 +47,7 @@ int main( int argc, char *argv[] )
 	n = superGetOpt(argc,argv, &argErr,
 			"-puffy %c %lf %s %d",&c, &lf, &s, &d,
 			"-eminem %hd %f", &h, &f,
+			"-e %d %d", &d1, &d2,
 			"-vanna *%f", farray, &numf,
 			"-stringo *%s", sarray, &nums,
 			"-what %s", &ss,
