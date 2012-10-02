@@ -1,7 +1,7 @@
 
 /*********************************************************************
 
-Copyright (c) 2007, Anthony P. Russo
+Copyright (c) 2007-2012, Anthony P. Russo
 
 All rights reserved.
 
@@ -25,22 +25,26 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *********************************************************************/
 
-
 /* Supergetopt: an amazing program to handle your argument needs.
 	It verifies options and the format of the arguments to them.
-	Handles variable argument lists also.
+	Handles variable argument lists also. Prints usage info as well.
 */
 
-#include <string.h>
+// suppress MS warnings under windows
+#define _CRT_SECURE_NO_WARNINGS 
+#define _CRT_SECURE_NO_DEPRECATE
+
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 #include "supergetopt.h"
 
 #define DEBUG 1
 
 #define MAXARGS 10		/* no called function can have more than this number of args */
-#define MAXOPTS 25		/* only this many options total to superGetOpt() */
+#define MAXOPTS 50		/* only this many options total to superGetOpt() */
 #define MAXSTRING 120	/* max of any string passed through */
 
 enum 
@@ -50,8 +54,11 @@ enum
 	INT,
 	FLOAT,
 	DOUBLE,
-	STRING 
+	STRING,
+	NUMTYPES
 };
+
+const char typeNames[NUMTYPES][10] = { "char", "short", "int", "float", "double", "string" };
 
 typedef union
 {
@@ -83,10 +90,11 @@ struct optionlist_s
 	ANYTYPE argval[MAXARGS];
 	int *pNumArgs;
 	int numArgsMax;
+	char *helpString;
 };
 
 
-static int superParseInternal( int argc, char **argv, int *lastArg, va_list ap );
+static int superParseInternal( int argc, char **argv, int usageCall,  int *lastArg, int *pUnAccountedFor, va_list ap );
 static ANYTYPE getval(char *s, int type, int *flag);
 static char myread_char(char *s, int *flag);
 static short myread_short(char *s, int *flag);
@@ -101,15 +109,27 @@ int superGetOpt( int argc, char **argv, int *lastArg, ... )
 {
 	va_list ap;
 	int n;
+	int usageCall = 0;
+	int unAccountedFor;
 	
-	argc--;
-	argv++;
+	if( argv != NULL )	argv++;
+	else usageCall = 1;
 	
+    if( argc <= 1 ) usageCall = 1;
+	else	argc--;
+
 	va_start( ap, lastArg );
 
-	n = superParseInternal( argc, argv, lastArg, ap );
+	n = superParseInternal( argc, argv, usageCall, lastArg, &unAccountedFor, ap );
 	
 	va_end( ap );
+	
+	printf("n=%d lastErr=%d arc=%d unAcc=%d\n", n,*lastArg,argc,unAccountedFor);
+	if( usageCall == 1 && *lastArg == 1 ) n = SG_ERROR_PRINT_USAGE;
+	else if( unAccountedFor )
+	{
+		n = unAccountedFor; // not necessarily an error, just unaccounted for args
+	}
 	
 	return(n);
 }
@@ -118,39 +138,58 @@ int superParseOpt( int argc, char **argv, int *lastArg, ... )
 {
 	va_list ap;
 	int n;
+	int usageCall = 0;
+	int unAccountedFor;
+	
+	if( argc == 0 || argv == NULL ) usageCall = 1;
 	
 	va_start( ap, lastArg );
 
-	n = superParseInternal( argc, argv, lastArg, ap );
+	n = superParseInternal( argc, argv, usageCall,lastArg, &unAccountedFor, ap );
 	
 	va_end( ap );
 	
+	if( usageCall == 1 && *lastArg == 1 ) n = SG_ERROR_PRINT_USAGE;
+	else if( unAccountedFor )
+	{
+		n = unAccountedFor; // not necessarily an error, just unaccounted for args
+	}
+		
 	return(n);
 }
 
-static int superParseInternal( int argc, char **argv, int *lastArg, va_list ap )
+static int superParseInternal( int argc, char **argv, int usageCall, int *lastArg, int *pUnAccountedFor, va_list ap )
 {
 	char *optstring[MAXOPTS+1];
-	int optnum, argsleft;
+	static int optnum;
+	int argsleft;
 	register int i,j;
 	int x;
 	int good;
-	int found;
+	int found = 0;
 	int noName;
-	struct optionlist_s optionlist[MAXOPTS+1];
+	static struct optionlist_s optionlist[MAXOPTS+1]; //static allows easy re-call for usage printout
 	int return_val;
 	int lastArgProcessed = argc;
 	int lastArgProcessedSuccessfully = 1;
 	int lastFlag = 0;
 	
-	// To do: return correct value (error or last arg processed) in all cases
+	*pUnAccountedFor = 0; // args not associated with detected flags
 	
+	*lastArg = 0;
+	
+	// To do: return correct value (error or last arg processed) in all cases
+	//printf("Orig optnum = %d usageCall=%d\n", optnum,usageCall);
 	return_val = 0;
 	
-	optnum = 0;
+	//optnum = 0;
+
+	if( argv == NULL ) argc = 0;
+
+	if( argc != 0 ) optnum = 0;
 
 	// parse all passed-in option formats
-	while( (optstring[optnum] = (char *) va_arg(ap, char *)) != (char *) NULL )
+	while( /*usageCall == 0 &&*/ (optstring[optnum] = (char *) va_arg(ap, char *)) != (char *) NULL )
 	{ 
 		optionlist[optnum].numargs = parse_string(optstring[optnum],&optionlist[optnum], &noName);
 		
@@ -219,8 +258,8 @@ static int superParseInternal( int argc, char **argv, int *lastArg, va_list ap )
 
 				// now pop pointer to numArgs
 				optionlist[optnum].pNumArgs = va_arg(ap, int *);
-				//printf("Varargs pNumArgs=0x%x\n", optionlist[optnum].argptr[i].pNumArgs);
 				optionlist[optnum].numArgsMax = *optionlist[optnum].pNumArgs;
+				//printf("Varargs pNumArgs=0x%x %d\n", optionlist[optnum].pNumArgs, *optionlist[optnum].pNumArgs);
 				if( optionlist[optnum].pNumArgs == NULL )
 				{
 					return( SG_ERROR_MISSING_ARG );
@@ -233,16 +272,20 @@ static int superParseInternal( int argc, char **argv, int *lastArg, va_list ap )
 		}
 		
 		// flagless arg (like -help)
-		if(optionlist[optnum].numargs == 0)
+		if(optionlist[optnum].numargs == 0 /*&& usageCall == 0*/)
 		{
 			// need to pop off the 
 			//printf("flagless arg <%s>\n", optstring[optnum]);
 			optionlist[optnum].argptr[0].i = va_arg(ap, int *);
 			*optionlist[optnum].argptr[0].i = 0; // init
 		}
-		
+
+#if SG_ENABLE_HELPSTRING
+		// get help string
+		optionlist[optnum].helpString = va_arg(ap, char *);
+#endif
 		optnum++;
-		
+		//printf("optnum = %d\n", optnum);
 		if( optnum > MAXOPTS )
 		{
 #if DEBUG
@@ -250,18 +293,51 @@ static int superParseInternal( int argc, char **argv, int *lastArg, va_list ap )
 #endif
 			lastArg = (int *) va_arg(ap, int *);
 			*lastArg = optnum;
-			return( SG_ERR_TOO_MANY_OPTIONS );
+			return( SG_ERROR_TOO_MANY_OPTIONS );
 		}
 	}
 
 
+	// user can tell us to print usage by calling with NULL or argc = 0 or both
+    if( argv == NULL || argc == 0 /*|| usageCall == 1*/ )
+	{
+		argc = 0; // prevent any parsing and just print out 
+		if( optnum > 0 ) fprintf(stderr, "***** Usage *****\n");
+		// print out usage!!!
+		//printf("Help optNum = %d\n", optnum);
+		for( i = 0 ; i < optnum ; i++ )
+		{
+			int t;
+			printf("\t %s", optionlist[i].name);
+			for( t = 0 ; t < optionlist[i].numargs ; t++ )
+			{
+				if( optionlist[i].varflag == 0 )
+				{
+				    printf( " %s", typeNames[optionlist[i].argtype[t]]);
+				}
+				else
+				{
+				    printf( " %s [%s, ...]", typeNames[optionlist[i].argtype[t]], typeNames[optionlist[i].argtype[t]]);
+				}
+			}
+#if SG_ENABLE_HELPSTRING
+			if( optionlist[i].helpString != NULL )
+			{
+				printf(" <%s>", optionlist[i].helpString);
+			}
+#endif
+			if( optnum > 0 ) printf("\n");
+		}
+		
+		return(0);
+	}
+	
 	argsleft = argc;
 			
 	//printf("Have argsleft=%d\n", argsleft);
 
-
 	// now process cmdline argument list
-	while( argsleft > 0 )
+	while( argsleft > 0 && usageCall == 0 )
 	{
 
 	for( i = 0, lastFlag = 0 ; i < optnum && argsleft > 0 ; i++ )
@@ -464,20 +540,21 @@ static int superParseInternal( int argc, char **argv, int *lastArg, va_list ap )
 
 	if( found == 0 )
 	{
-		//fprintf(stderr,"option not found at argv=%s left=%d\n",argv[0],argsleft);
 #if DEBUG
+		fprintf(stderr,"option not found at argv=%s left=%d lastProc=%d latProcSuc=%d\n",argv[0],argsleft,lastArgProcessed,lastArgProcessedSuccessfully);
 		//fprintf(stderr,"User did not supply option name <%s>\n",optionlist[lastFlag].name);
 #endif
 		//*lastArg = lastArgProcessed+1;
 		*lastArg = lastArgProcessedSuccessfully;
-		return( SG_ERROR_TOO_MANY_ARGS );
+		//return( SG_ERROR_TOO_MANY_ARGS );
+		(*pUnAccountedFor)++;
 		if( argsleft > 0 ) argv++;
 		argsleft--;
 	}
 	
 	}
 
-	*lastArg = lastArgProcessedSuccessfully;
+	//*lastArg = lastArgProcessedSuccessfully;
 	//return_val = lastArgProcessed;
 	
 	return( return_val );
@@ -486,7 +563,8 @@ static int superParseInternal( int argc, char **argv, int *lastArg, va_list ap )
 
 static int parse_string(char *s, struct optionlist_s *option, int *noName)
 {
-	int len, z;
+    size_t len;
+	int z;
 	int offset = 0;
 	char *pN, *pM;
 
@@ -500,7 +578,7 @@ static int parse_string(char *s, struct optionlist_s *option, int *noName)
 	if( len < 2 )
 	{
 #if DEBUG
-		fprintf(stderr, "Parse_string: option has zero length <%s> len=%d\n", s, len);
+		fprintf(stderr, "Parse_string: option has zero length <%s> len=%d\n", s, (int) len);
 #endif
 		return(SG_ERROR_ZERO_LEN_OPTION);
 	}
@@ -599,7 +677,9 @@ static int parse_format(char *s, int *argtypes)
 	}
 
 	len = strlen( sp );
-	scopy = (char *) strdup( sp );
+	scopy = malloc( len + 1 );
+	strcpy( scopy, sp );
+	//scopy = (char *) strdup( sp ); // eliminate strdup call
 
 	for( numargs = 0, arg[numargs] = strtok(scopy, "%");
 		(arg[++numargs] = strtok( (char *) NULL, "%")) != NULL && numargs < MAXARGS-1; )
@@ -653,6 +733,7 @@ static int parse_format(char *s, int *argtypes)
 static ANYTYPE getval(char *s, int type, int *flag)
 {
 	ANYTYPE value;
+	value.d = 0.0;
 
 	*flag = 0;
 

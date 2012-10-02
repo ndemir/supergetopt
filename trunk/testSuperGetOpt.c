@@ -23,6 +23,22 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *********************************************************************/
+/*********************************************************************
+    This file is part of SuperGetOpt.
+
+    SuperGetOpt is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    SuperGetOpt is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public License
+    along with SuperGetOpt.  If not, see <http://www.gnu.org/licenses/>.
+**********************************************************************/
 
 #include <stdio.h>
 #include "supergetopt.h"
@@ -32,29 +48,53 @@ static void usage();
 int main( int argc, char *argv[] )
 {
 	int n, i;
-	int argErr;
+	int argPos;
 	
-	char c; double lf; char *s; int d, d1, d2; short h; float f;
+	// default values
+	char c = 'A'; 
+	double lf = 3.333; 
+	char *s = NULL; 
+	int d=0, d1=1, d2=2; 
+	short h = 12; 
+	float f = 15.0;
+	char *ss = NULL;
+	
 	float farray[20];
 	int numf = 20; // must be set to max initially -- will be overwritten with actual number
-	char *sarray[10];
+	char *sarray[10] = {0};
 	int nums = 10;
-	int helpSet = 12;
-	char *ss;
+	int helpSet = 0;
 	
-/* example call to supergetopt */
-
-	n = superGetOpt(argc,argv, &argErr,
-			"-puffy %c %lf %s %d",&c, &lf, &s, &d,
-			"-eminem %hd %f", &h, &f,
-			"-e %d %d", &d1, &d2,
-			"-vanna *%f", farray, &numf,
-			"-stringo *%s", sarray, &nums,
-			"-what %s", &ss,
-			"-help", &helpSet,
+/* example call to supergetopt. If called with NULL argv, will print usage info */
+	
+	n = superGetOpt(argc,argv, &argPos,
+			"-puffy %c %lf %s %d",&c, &lf, &s, &d, "help message 1",
+			"-eminem %hd %f", &h, &f, "help message 2",
+			"-e %d %d", &d1, &d2, "help message 3",
+			"-vanna *%f", farray, &numf, "help message 4",
+			"-stringo *%s", sarray, &nums, "help message 5",
+			"-what %s", &ss, "help message 6",
+			"-help", &helpSet, "to get this help message",
 			(char * ) 0 ); 
-#if 1	
+
+	printf("Supergetopt returned %d argPos=%d helpSet=%d\n", n,argPos,helpSet);
+	
+	
+	// Note: n = SG_ERROR_EXTRA_ARGS just means extra args, starting at argv[argPos]
+	if( helpSet || (n < 0) ) 
+	{
+		usage();
+		return(1);
+	}
+	else if( n > 0)
+	{
+		printf("Have %d extra Args: ", n);
+		for( i = argPos ; i < argPos+n ; i++ ) printf("<%s> ", argv[i]);
+		printf("\n");
+	}
 	printf("-puffy has c=%c double=%lf s=%s int=%d eminem has short=%hd fl=%f\n", c,lf,s,d,h,f);
+	printf("nums = %d numf=%d\n", nums,numf);
+	
 	//printf("-stringo array=%s,%s,%s nums=%d\n", sarray[0],sarray[1],sarray[2],nums);
 	for( i = 0, printf("stringo: ") ; i < nums ; i++ )
 		printf("<%s> ", sarray[i]);
@@ -62,23 +102,14 @@ int main( int argc, char *argv[] )
 	for( i = 0, printf("vanna: ") ; i < numf ; i++ )
 		printf("<%f> ", farray[i]);
 	printf("\n");
-#endif
-	printf("Supergetopt returned %d argErr=%d helpSet=%d\n", n,argErr,helpSet);
-	
-	if( helpSet ) usage();
+
 	
 	return(0);
 }
 
 static void usage()
 {
-printf("testSuperGet: [options] Options:\n\
-\t[-puffy: <char> <double> <string> <int>]\n\
-\t[-eminem: <short> <float>]\n\
-\t[-stringo: <string1> ... <stringN>]\n\
-\t[-what: <string>]\n\
-\t[-vanna: <float1> ... <floatN>]\n\
-\t[-help]\n"
- );
+	int argErr;
+	
+	superGetOpt(0,NULL, &argErr, NULL); // prints help info
 }
-
