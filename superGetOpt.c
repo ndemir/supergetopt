@@ -41,7 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include "supergetopt.h"
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define MAXARGS 10		/* no called function can have more than this number of args */
 #define MAXOPTS 50		/* only this many options total to superGetOpt() */
@@ -123,8 +123,9 @@ int superGetOpt( int argc, char **argv, int *lastArg, ... )
 	n = superParseInternal( argc, argv, usageCall, lastArg, &unAccountedFor, ap );
 	
 	va_end( ap );
-	
+#if DEBUG
 	printf("n=%d lastErr=%d arc=%d unAcc=%d\n", n,*lastArg,argc,unAccountedFor);
+#endif
 	if( usageCall == 1 && *lastArg == 1 ) n = SG_ERROR_PRINT_USAGE;
 	else if( unAccountedFor )
 	{
